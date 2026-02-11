@@ -1,0 +1,8 @@
+groq
+python-dotenv
+edge-tts
+requests
+moviepy==1.0.3
+pillow
+imageio
+imageio-ffmpeg
