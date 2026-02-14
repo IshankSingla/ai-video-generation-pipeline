@@ -1,6 +1,8 @@
 import os
 import requests
 from dotenv import load_dotenv
+from utils import retry_request
+
 
 load_dotenv()
 
@@ -30,21 +32,25 @@ def extract_keywords(sentence: str):
 
 
 def fetch_image(query: str, index: int):
-    url = "https://api.pexels.com/v1/search"
-    params = {
-        "query": query,
-        "per_page": 1
-    }
+    def api_call():
+        url = "https://api.pexels.com/v1/search"
+        params = {
+            "query": query,
+            "per_page": 1
+        }
 
-    response = requests.get(url, headers=HEADERS, params=params)
-    data = response.json()
+        response = requests.get(url, headers=HEADERS, params=params, timeout=5)
 
-    # DEBUG (very important for screen recording)
-    print(f"Searching Pexels for: '{query}'")
+        if response.status_code != 200:
+            raise RuntimeError(f"Pexels API error: {response.status_code}")
 
-    if data.get("photos"):
+        data = response.json()
+
+        if not data.get("photos"):
+            raise ValueError("No images found")
+
         image_url = data["photos"][0]["src"]["large"]
-        img_data = requests.get(image_url).content
+        img_data = requests.get(image_url, timeout=5).content
 
         image_path = os.path.join(IMAGES_DIR, f"image_{index}.jpg")
         with open(image_path, "wb") as f:
@@ -52,7 +58,13 @@ def fetch_image(query: str, index: int):
 
         return image_path
 
-    return None
+    try:
+        print(f"🔍 Fetching image for query: '{query}'")
+        return retry_request(api_call)
+    except Exception as e:
+        print(f"❌ Failed to fetch image for '{query}': {e}")
+        return None
+
 
 
 def generate_visuals(script_text: str):
